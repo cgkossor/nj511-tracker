@@ -1,4 +1,6 @@
 config.py
+deploy.ps1
+deploy.sh
 seen_incidents.db
 monitor.log
 __pycache__/
