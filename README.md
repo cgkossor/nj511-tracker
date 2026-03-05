@@ -1,149 +1,208 @@
-# NJ 511 GSP Traffic Monitor
+# NJ 511 GSP Traffic Monitor & Trend Tracker
 
-Polls [511NJ.org](https://511nj.org) RSS feeds every 5 minutes for traffic events on the **Garden State Parkway** between **Exits 117–140** (northbound and southbound). Sends email alerts via Gmail when relevant events are detected.
+Two systems running on a VM that monitor the **Garden State Parkway** via [511NJ.org](https://511nj.org) RSS feeds:
 
-## Alert Types
+1. **Alert Monitor** (`monitor.py`) — Emails you about incidents, congestion, and construction near Exits 117–140
+2. **Trend Tracker** (`collector.py`) — Logs ALL GSP events (full parkway) for analysis, with a daily digest email and local HTML dashboard
 
-| Category | Emoji | Trigger | When Sent |
-|---|---|---|---|
-| **Incident** | 🚨 | Any matching event | Immediately, once per day per incident |
-| **Congestion** | 🚗 | Any matching event | After 8 PM ET only, once per day |
-| **Weather** | 🌧️ | Any matching event | Immediately, once per day |
-| **Construction** | 🚧 | Lane closure keywords required | When active or starting within 30 min |
-| **Special Event** | 🎪 | Any matching event | When active or starting within 30 min |
-| **Planned** | 📋 | Lane closure keywords required | When active or starting within 30 min |
+---
 
-## Filtering Rules
+## Deployment
+
+### How to deploy code changes
+
+From your local machine (PowerShell):
+
+```powershell
+git add .
+git commit -m "description of changes"
+.\deploy.ps1
+```
+
+This does the following automatically:
+1. Pushes your commit to GitHub
+2. Pulls the latest code on the VM
+3. Installs any new pip dependencies
+4. Copies and enables both systemd services
+5. Restarts both `gsp-monitor` and `gsp-collector`
+
+**Note:** `config.py` is gitignored (contains passwords). If you add new config values, you must manually edit `config.py` on the VM:
+
+```bash
+nano ~/nj511-tracker/config.py
+```
+
+---
+
+## Alert Monitor (`monitor.py`)
+
+Polls every 5 minutes for events on GSP Exits 117–140. Sends email alerts via Gmail.
+
+### Alert Types
+
+| Category | Trigger | When Sent |
+|---|---|---|
+| **Incident** | Any matching event | Immediately, once per day |
+| **Congestion** | Any matching event | After 8 PM ET only |
+| **Weather** | Any matching event | Immediately, once per day |
+| **Construction** | Lane closure keywords | When active or starting within 30 min |
+| **Special Event** | Any matching event | When active or starting within 30 min |
+| **Planned** | Lane closure keywords | When active or starting within 30 min |
+
+### Filtering Rules
 
 An event triggers an alert only if **all** of these are true:
 
-1. **Road** — "Garden State Parkway" appears in the RSS title
-2. **Direction** — "northbound" or "southbound" in the title
-3. **Exit range** — At least one exit number between 117–140 mentioned
-4. **Lane closure** (construction/planned only) — Description contains "lane closed", "lane blocked", etc.
-5. **Schedule** (non-urgent only) — Event is currently active or starts within 30 minutes
-6. **Dedup** — Not already alerted today for this incident
+1. "Garden State Parkway" in the RSS title
+2. "northbound" or "southbound" in the title
+3. At least one exit number between 117–140
+4. Lane closure keywords (construction/planned only)
+5. Currently active or starting within 30 min (non-urgent only)
+6. Not already alerted today
 
-## Email Format
+---
 
-Alerts are sent as HTML emails with a structured table:
+## Trend Tracker
 
+Collects ALL GSP events (full parkway, all 6 feed types) every 5 minutes into a SQLite database for trend analysis. All times displayed in ET, dates as "Mar 5, 2026".
+
+### Components
+
+| File | Purpose | Runs On |
+|---|---|---|
+| `collector.py` | Polls all 6 feeds every 5 min, stores GSP events in SQLite | VM (systemd) |
+| `analysis.py` | Shared analysis functions with ET timezone support | Imported |
+| `digest.py` | Daily email digest with cross-category analysis | VM (cron) |
+| `dashboard.py` | Generates standalone HTML report with Plotly charts | Local |
+
+### Feeds Collected
+
+| Category | What it captures |
+|---|---|
+| Incident | Crashes, breakdowns, hazards |
+| Congestion | Slowdowns, stop-and-go traffic |
+| Construction | Active construction zones |
+| Weather | Weather-related events |
+| Special Event | Sporting events, concerts, etc. |
+| Planned | Upcoming construction and events |
+
+### Analysis Capabilities
+
+**Overview:**
+- Events by category breakdown
+- All events by hour of day (stacked by category)
+- Section severity ranking (composite across all types)
+
+**Incident Analysis:**
+- Incident hotspots (worst sections)
+- Incident vs congestion correlation (scatter plot)
+- Simultaneous incident + congestion overlap
+
+**Congestion Analysis:**
+- Most congested sections
+- NB vs SB by hour of day (ET)
+- Morning vs evening commute comparison by direction
+- Day of week patterns
+
+**Trends & Patterns:**
+- Peak hours heatmap (hour x day of week)
+- Weekly trend by category
+- Congestion duration distribution
+
+### Daily Digest Email
+
+Sent automatically at 9 PM ET with:
+- Yesterday's events by category
+- Top incident and congestion hotspots (7 days)
+- Incident-congestion overlap sections
+- NB vs SB commute comparison
+- Weekly trend by category (week-over-week change)
+
+### Local Dashboard
+
+After data accumulates, sync the DB and generate the report:
+
+```powershell
+scp -i C:\Users\cgkos\Documents\recgov_scanner\ssh-key-2026-02-24.key ubuntu@138.2.214.121:~/nj511-tracker/gsp_congestion.db .
+python dashboard.py
 ```
-Subject: 🚧 GSP Construction:  ⬇️ Exit 136 → 132
 
-🚧 CONSTRUCTION ALERT
+Options:
 
-📍 Where:   Garden State Parkway Southbound
-🔢 Exits:   136 → 132
-📅 Dates:   Monday March 2nd, 2026 – Saturday March 7th, 2026
-⏰ When:    Mon–Fri, 08:00 PM → 06:00 AM
-🚗 Impact:  1 Left lane of 5 lanes closed
-📋 Status:  ⚠️ Starting in 25m
-🔧 Type:    construction
-
-🔗 Details
+```powershell
+python dashboard.py --days 7          # last 7 days only
+python dashboard.py --days 90         # last 90 days
+python dashboard.py --no-open         # don't auto-open browser
+python dashboard.py --output my.html  # custom output filename
 ```
 
-## Setup
+---
 
-1. Clone the repo on your server
-2. Install dependencies: `pip install -r requirements.txt`
-3. Create `config.py` with your settings:
+## Setup (from scratch)
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/cgkossor/nj511-tracker.git
+cd nj511-tracker
+pip install -r requirements.txt
+```
+
+### 2. Create `config.py`
 
 ```python
+# Email settings
 SMTP_HOST = "smtp.gmail.com"
 SMTP_PORT = 587
 EMAIL_FROM = "you@gmail.com"
 EMAIL_TO = "you@gmail.com"
 EMAIL_PASSWORD = "your-app-password"
 
+# Alert filters
 ROAD_NAME = "Garden State Parkway"
 EXIT_MIN = 117
 EXIT_MAX = 140
 DIRECTIONS = ["northbound", "southbound"]
 
-POLL_INTERVAL = 5          # minutes
-ALERT_LEAD_MINUTES = 30    # alert before scheduled events start
-CONGESTION_ALERT_AFTER_HOUR = 20  # only send congestion alerts at or after this hour (24h, local time)
+# Poll interval (minutes)
+POLL_INTERVAL = 5
+ALERT_LEAD_MINUTES = 30
+CONGESTION_ALERT_AFTER_HOUR = 20  # 8 PM ET
+
+# Trend Tracker
+TRACKER_DB = "gsp_congestion.db"
+CONGESTION_DB = TRACKER_DB
+COLLECTOR_POLL_INTERVAL = 5
+DIGEST_HOUR = 21  # 9 PM ET
 ```
 
-4. Install the systemd service:
+### 3. Set up daily digest cron
+
 ```bash
-sudo cp gsp-monitor.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable gsp-monitor
-sudo systemctl start gsp-monitor
+crontab -e
+# Add: 0 2 * * * cd /home/ubuntu/nj511-tracker && python3 digest.py --now
 ```
 
-## Deployment
+(0 2 UTC = 9 PM ET during EST)
 
-From your local machine, run the PowerShell deploy script:
-
-```powershell
-.\deploy.ps1
-```
-
-This pushes to GitHub, pulls on the VM, installs dependencies, and restarts the systemd service.
+---
 
 ## Useful Commands
 
 ```bash
-sudo systemctl status gsp-monitor    # check if running
-sudo systemctl restart gsp-monitor   # restart
-journalctl -u gsp-monitor -f         # view live logs
-```
+# Check services
+sudo systemctl status gsp-monitor gsp-collector
 
----
+# View logs
+journalctl -u gsp-monitor -f
+journalctl -u gsp-collector -f
 
-## Congestion Trend Tracker
+# Restart services
+sudo systemctl restart gsp-monitor gsp-collector
 
-A separate system that monitors the **full length of the GSP** to collect congestion data and analyze trends over time.
+# Check collected data
+sqlite3 gsp_congestion.db "SELECT category, COUNT(*) FROM events GROUP BY category;"
 
-### Components
-
-| File | Purpose | Runs On |
-|---|---|---|
-| `collector.py` | Polls congestion feed every 5 min, stores all GSP events in SQLite | VM (systemd) |
-| `analysis.py` | Shared analysis functions (worst sections, NB vs SB, commute patterns, etc.) | Imported |
-| `digest.py` | Sends a daily HTML email digest with key stats | VM (cron/schedule) |
-| `dashboard.py` | Generates a standalone HTML report with interactive Plotly charts | Local |
-
-### Analysis Capabilities
-
-- **Worst Sections** — Which exit ranges have the most congestion events
-- **NB vs SB by Time of Day** — Direction comparison by hour
-- **Commute Comparison** — Morning (5-10 AM) vs Evening (3-8 PM) by direction
-- **Day of Week Patterns** — Weekday vs weekend congestion
-- **Duration Analysis** — How long congestion persists by section
-- **Weekly Trends** — Is congestion getting better or worse over time
-- **Peak Hours Heatmap** — Hour x day-of-week congestion grid
-
-### VM Setup (Collector + Digest)
-
-```bash
-# Install the collector service
-sudo cp gsp-collector.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable gsp-collector
-sudo systemctl start gsp-collector
-
-# Run digest on a daily cron (e.g., 9 PM)
-crontab -e
-# Add: 0 21 * * * cd /home/ubuntu/nj511-tracker && python3 digest.py --now
-```
-
-### Local Dashboard
-
-```bash
-# Sync the DB from the VM
-scp ubuntu@your-vm:~/nj511-tracker/gsp_congestion.db .
-
-# Generate the report (opens in browser)
-python dashboard.py
-
-# Options
-python dashboard.py --days 7          # last 7 days only
-python dashboard.py --days 90         # last 90 days
-python dashboard.py --no-open         # don't auto-open browser
-python dashboard.py --output my.html  # custom output file
+# Send a test digest
+python3 digest.py --now
 ```
