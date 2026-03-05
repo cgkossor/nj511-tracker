@@ -3,26 +3,36 @@ import sqlite3
 import schedule
 import time
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 import config
 
 
-CONGESTION_FEED = "https://511nj.org/client/rest/rss/RSSActiveCongestion"
+FEEDS = [
+    {"url": "https://511nj.org/client/rest/rss/RSSActiveIncidents", "category": "Incident"},
+    {"url": "https://511nj.org/client/rest/rss/RSSActiveCongestion", "category": "Congestion"},
+    {"url": "https://511nj.org/client/rest/rss/RSSActiveConstruction", "category": "Construction"},
+    {"url": "https://511nj.org/client/rest/rss/RSSActiveWeather", "category": "Weather"},
+    {"url": "https://511nj.org/client/rest/rss/RSSActiveSpecialEvents", "category": "Special Event"},
+    {"url": "https://511nj.org/client/rest/rss/RSSPlannedConstructionAndSpecialEvents", "category": "Planned"},
+]
 
 
 def init_db():
-    conn = sqlite3.connect(config.CONGESTION_DB)
+    conn = sqlite3.connect(config.TRACKER_DB)
+    # New unified events table
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS congestion_events (
+        CREATE TABLE IF NOT EXISTS events (
             id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_id    TEXT NOT NULL UNIQUE,
+            event_id    TEXT NOT NULL,
+            category    TEXT NOT NULL,
             first_seen  TEXT NOT NULL,
             last_seen   TEXT NOT NULL,
-            direction   TEXT NOT NULL,
+            direction   TEXT,
             exit_start  INTEGER,
             exit_end    INTEGER,
             title       TEXT,
-            description TEXT
+            description TEXT,
+            UNIQUE(event_id, category)
         )
     """)
     conn.commit()
@@ -43,62 +53,70 @@ def extract_direction(title):
 
 
 def collect():
-    print(f"[{datetime.now()}] Collecting congestion data...")
+    now_utc = datetime.now(timezone.utc).isoformat()
+    print(f"[{now_utc}] Collecting all GSP feeds...")
     conn = init_db()
 
-    try:
-        feed = feedparser.parse(CONGESTION_FEED)
-        if feed.bozo:
-            print(f"[{datetime.now()}] Feed parse warning: {feed.bozo_exception}")
-        entries = feed.entries
-    except Exception as e:
-        print(f"[{datetime.now()}] Feed fetch error: {e}")
-        conn.close()
-        return
+    total_new = 0
+    total_updated = 0
 
-    now = datetime.now().isoformat()
-    active_ids = set()
-    new_count = 0
-    updated_count = 0
-
-    for entry in entries:
-        title = entry.get("title") or ""
-        desc = entry.get("description") or entry.get("summary") or ""
-
-        # Only GSP entries
-        if "garden state parkway" not in title.lower():
+    for feed_config in FEEDS:
+        category = feed_config["category"]
+        try:
+            feed = feedparser.parse(feed_config["url"])
+            entries = feed.entries
+        except Exception as e:
+            print(f"  [{category}] Feed error: {e}")
             continue
 
-        direction = extract_direction(title)
-        if not direction:
-            continue
+        new_count = 0
+        updated_count = 0
 
-        event_id = entry.get("id") or entry.get("link") or str(hash(str(entry)))
-        active_ids.add(event_id)
+        for entry in entries:
+            title = entry.get("title") or ""
+            desc = entry.get("description") or entry.get("summary") or ""
 
-        exits = extract_exit_numbers(f"{title} {desc}")
-        exit_start = max(exits) if exits else None
-        exit_end = min(exits) if exits else None
+            # Only GSP entries
+            if "garden state parkway" not in title.lower():
+                continue
 
-        row = conn.execute("SELECT event_id FROM congestion_events WHERE event_id = ?", (event_id,)).fetchone()
-        if row:
-            conn.execute("UPDATE congestion_events SET last_seen = ? WHERE event_id = ?", (now, event_id))
-            updated_count += 1
-        else:
-            conn.execute("""
-                INSERT INTO congestion_events (event_id, first_seen, last_seen, direction, exit_start, exit_end, title, description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (event_id, now, now, direction, exit_start, exit_end, title, desc))
-            new_count += 1
+            event_id = entry.get("id") or entry.get("link") or str(hash(str(entry)))
+            direction = extract_direction(title)
+            exits = extract_exit_numbers(f"{title} {desc}")
+            exit_start = max(exits) if exits else None
+            exit_end = min(exits) if exits else None
+
+            row = conn.execute(
+                "SELECT event_id FROM events WHERE event_id = ? AND category = ?",
+                (event_id, category)
+            ).fetchone()
+
+            if row:
+                conn.execute(
+                    "UPDATE events SET last_seen = ? WHERE event_id = ? AND category = ?",
+                    (now_utc, event_id, category)
+                )
+                updated_count += 1
+            else:
+                conn.execute("""
+                    INSERT INTO events (event_id, category, first_seen, last_seen, direction, exit_start, exit_end, title, description)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (event_id, category, now_utc, now_utc, direction, exit_start, exit_end, title, desc))
+                new_count += 1
+
+        total_new += new_count
+        total_updated += updated_count
+        gsp_count = new_count + updated_count
+        print(f"  [{category}] {len(entries)} feed entries, {gsp_count} GSP ({new_count} new, {updated_count} updated)")
 
     conn.commit()
     conn.close()
-    print(f"[{datetime.now()}] Done: {new_count} new, {updated_count} updated, {len(entries)} total feed entries")
+    print(f"[{now_utc}] Total: {total_new} new, {total_updated} updated")
 
 
 if __name__ == "__main__":
-    print(f"GSP Congestion Collector started. Polling every {config.COLLECTOR_POLL_INTERVAL} minutes.")
-    print(f"Database: {config.CONGESTION_DB}")
+    print(f"GSP Collector started. Polling {len(FEEDS)} feeds every {config.COLLECTOR_POLL_INTERVAL} minutes.")
+    print(f"Database: {config.TRACKER_DB}")
     collect()
     schedule.every(config.COLLECTOR_POLL_INTERVAL).minutes.do(collect)
     while True:

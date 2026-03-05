@@ -4,6 +4,7 @@ deploy.sh
 seen_incidents.db
 gsp_congestion.db
 gsp_report.html
+OPERATIONS.md
 monitor.log
 __pycache__/
 venv/

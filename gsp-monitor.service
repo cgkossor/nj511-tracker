@@ -19,6 +19,7 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/nj511-tracker
+Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 monitor.py
 Restart=on-failure
 RestartSec=30
