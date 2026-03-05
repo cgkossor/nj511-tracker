@@ -1,0 +1,5 @@
+config.py
+seen_incidents.db
+monitor.log
+__pycache__/
+venv/

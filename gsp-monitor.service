@@ -1,0 +1,27 @@
+# GSP Lane Closure Monitor - systemd service file
+#
+# Installation:
+#   1. Copy to systemd:  sudo cp gsp-monitor.service /etc/systemd/system/
+#   2. Edit the file to set your username and project path:
+#      sudo nano /etc/systemd/system/gsp-monitor.service
+#   3. Reload systemd:   sudo systemctl daemon-reload
+#   4. Enable on boot:   sudo systemctl enable gsp-monitor
+#   5. Start now:        sudo systemctl start gsp-monitor
+#   6. Check status:     sudo systemctl status gsp-monitor
+#   7. View logs:        journalctl -u gsp-monitor -f
+
+[Unit]
+Description=GSP Lane Closure Monitor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=youruser
+WorkingDirectory=/home/youruser/nj511-tracker
+ExecStart=/usr/bin/python3 monitor.py
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
