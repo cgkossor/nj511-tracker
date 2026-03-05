@@ -386,6 +386,11 @@ def check_feed():
             schedule_info = parse_schedule(desc)
 
             if feed_config["urgent"]:
+                # Congestion alerts only after configured hour
+                if feed_config["category"] == "Congestion":
+                    if datetime.now().hour < config.CONGESTION_ALERT_AFTER_HOUR:
+                        mark_seen(conn, inc_id)
+                        continue
                 # Urgent feeds (incidents, congestion, weather) — alert immediately
                 if not already_alerted_today(conn, inc_id):
                     subject, body = format_alert(entry, feed_config)
