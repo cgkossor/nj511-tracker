@@ -42,12 +42,12 @@ Polls every 5 minutes for events on GSP Exits 117–140. Sends email alerts via 
 
 | Category | Trigger | When Sent |
 |---|---|---|
-| **Incident** | Any matching event | Immediately, once per day |
-| **Congestion** | Any matching event | After 8 PM ET only |
-| **Weather** | Any matching event | Immediately, once per day |
-| **Construction** | Lane closure keywords | When active or starting within 30 min |
-| **Special Event** | Any matching event | When active or starting within 30 min |
-| **Planned** | Lane closure keywords | When active or starting within 30 min |
+| 🚨 **Incident** | Any matching event | Immediately, once per day |
+| 🚗 **Congestion** | Any matching event | After 8 PM ET only |
+| 🌧️ **Weather** | Any matching event | Immediately, once per day |
+| 🚧 **Construction** | Lane closure keywords | When active or starting within 30 min |
+| 🎪 **Special Event** | Any matching event | When active or starting within 30 min |
+| 📋 **Planned** | Lane closure keywords | When active or starting within 30 min |
 
 ### Filtering Rules
 
@@ -79,12 +79,12 @@ Collects ALL GSP events (full parkway, all 6 feed types) every 5 minutes into a 
 
 | Category | What it captures |
 |---|---|
-| Incident | Crashes, breakdowns, hazards |
-| Congestion | Slowdowns, stop-and-go traffic |
-| Construction | Active construction zones |
-| Weather | Weather-related events |
-| Special Event | Sporting events, concerts, etc. |
-| Planned | Upcoming construction and events |
+| 🚨 Incident | Crashes, breakdowns, hazards |
+| 🚗 Congestion | Slowdowns, stop-and-go traffic |
+| 🚧 Construction | Active construction zones |
+| 🌧️ Weather | Weather-related events |
+| 🎪 Special Event | Sporting events, concerts, etc. |
+| 📋 Planned | Upcoming construction and events |
 
 ### Analysis Capabilities
 
@@ -123,7 +123,7 @@ Sent automatically at 9 PM ET with:
 After data accumulates, sync the DB and generate the report:
 
 ```powershell
-scp -i C:\Users\cgkos\Documents\recgov_scanner\ssh-key-2026-02-24.key ubuntu@138.2.214.121:~/nj511-tracker/gsp_congestion.db .
+scp user@your-vm:~/nj511-tracker/gsp_congestion.db .
 python dashboard.py
 ```
 
