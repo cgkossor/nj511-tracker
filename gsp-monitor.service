@@ -17,8 +17,8 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=youruser
-WorkingDirectory=/home/youruser/nj511-tracker
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nj511-tracker
 ExecStart=/usr/bin/python3 monitor.py
 Restart=on-failure
 RestartSec=30

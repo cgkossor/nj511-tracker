@@ -11,10 +11,13 @@ ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && git pull"
 Write-Host "Installing dependencies on VM..."
 ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && pip install -r requirements.txt -q"
 
-Write-Host "Clearing alert history and restarting monitor on VM..."
-ssh -i $SSH_KEY $SERVER "screen -S gsp-monitor -X quit 2>/dev/null; pkill -f 'python3 $REMOTE_DIR/monitor.py' 2>/dev/null; sleep 1; rm -f $REMOTE_DIR/seen_incidents.db; cd $REMOTE_DIR && screen -dmS gsp-monitor /usr/bin/python3 $REMOTE_DIR/monitor.py"
+Write-Host "Installing systemd service..."
+ssh -i $SSH_KEY $SERVER "sudo cp $REMOTE_DIR/gsp-monitor.service /etc/systemd/system/ && sudo systemctl daemon-reload && sudo systemctl enable gsp-monitor"
+
+Write-Host "Restarting monitor..."
+ssh -i $SSH_KEY $SERVER "sudo systemctl restart gsp-monitor"
 
 Start-Sleep -Seconds 3
 
 Write-Host "Deployed! Checking status..."
-ssh -i $SSH_KEY $SERVER "ps aux | grep '$REMOTE_DIR/monitor.py' | grep -v grep"
+ssh -i $SSH_KEY $SERVER "sudo systemctl status gsp-monitor --no-pager"
