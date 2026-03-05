@@ -226,7 +226,7 @@ def parse_details(entry, feed_config):
             direction = d.capitalize()
             break
 
-    dir_arrow = {"Northbound": "\u2191", "Southbound": "\u2193"}.get(direction, "")
+    dir_arrow = {"Northbound": "\u2b06\ufe0f", "Southbound": "\u2b07\ufe0f"}.get(direction, "")
 
     exits = extract_exit_numbers(desc)
     if exits:
@@ -334,21 +334,23 @@ def format_alert(entry, feed_config):
 
     subject = f"{emoji} GSP {details['dir_arrow']} {feed_config['category']}:  Exit {details['exits']}"
 
+    # Pad labels to equal width so the detail column aligns
+    W = 10  # label width including colon
     lines = [
         f"{emoji} {category} ALERT",
         f"",
-        f"\U0001f4cd Where:    {config.ROAD_NAME} {details['direction']}",
-        f"\U0001f522 Exits:    {details['exits']}",
-        f"\U0001f4c5 Dates:    {details['date_range']}",
-        f"\u23f0 When:     {details['when']}",
-        f"\U0001f697 Impact:   {details['impact']}",
-        f"\U0001f4cb Status:   {details['status']}",
-        f"\U0001f527 Type:     {details['event_type']}",
+        f"\U0001f4cd {'Where:':<{W}}{config.ROAD_NAME} {details['direction']}",
+        f"\U0001f522 {'Exits:':<{W}}{details['exits']}",
+        f"\U0001f4c5 {'Dates:':<{W}}{details['date_range']}",
+        f"\u23f0 {'When:':<{W}}{details['when']}",
+        f"\U0001f697 {'Impact:':<{W}}{details['impact']}",
+        f"\U0001f4cb {'Status:':<{W}}{details['status']}",
+        f"\U0001f527 {'Type:':<{W}}{details['event_type']}",
     ]
 
     if link:
         lines.append(f"")
-        lines.append(f"\U0001f517 Link:     {link}")
+        lines.append(f"\U0001f517 {'Link:':<{W}}{link}")
 
     lines.append(f"")
     lines.append(f"--")

@@ -1,4 +1,4 @@
-$SSH_KEY = "./ssh-key-2026-02-24.key"
+$SSH_KEY = "C:\Users\cgkos\Documents\recgov_scanner\ssh-key-2026-02-24.key"
 $SERVER = "ubuntu@138.2.214.121"
 $REMOTE_DIR = "/home/ubuntu/nj511-tracker"
 
