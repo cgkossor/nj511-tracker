@@ -332,7 +332,7 @@ def format_alert(entry, feed_config):
     emoji = feed_config["emoji"]
     category = feed_config["category"].upper()
 
-    subject = f"{emoji} GSP {details['dir_arrow']} {feed_config['category']}:  Exit {details['exits']}"
+    subject = f"{emoji} GSP {feed_config['category']}:  {details['dir_arrow']} Exit {details['exits']}"
 
     # Pad labels to equal width so the detail column aligns
     W = 10  # label width including colon

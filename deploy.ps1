@@ -11,8 +11,10 @@ ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && git pull"
 Write-Host "Installing dependencies on VM..."
 ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && pip install -r requirements.txt -q"
 
-Write-Host "Restarting monitor on VM..."
-ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && pkill -f 'python3 monitor.py'; nohup python3 $REMOTE_DIR/monitor.py >> $REMOTE_DIR/monitor.log 2>&1 &"
+Write-Host "Clearing alert history and restarting monitor on VM..."
+ssh -i $SSH_KEY $SERVER "pkill -f 'python3 $REMOTE_DIR/monitor.py' 2>/dev/null; sleep 1; rm -f $REMOTE_DIR/seen_incidents.db; cd $REMOTE_DIR && setsid python3 $REMOTE_DIR/monitor.py >> $REMOTE_DIR/monitor.log 2>&1 < /dev/null &"
+
+Start-Sleep -Seconds 3
 
 Write-Host "Deployed! Checking status..."
-ssh -i $SSH_KEY $SERVER "ps aux | grep 'monitor.py' | grep -v grep"
+ssh -i $SSH_KEY $SERVER "ps aux | grep '$REMOTE_DIR/monitor.py' | grep -v grep"
