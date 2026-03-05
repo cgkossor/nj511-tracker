@@ -312,7 +312,7 @@ def parse_details(entry, feed_config):
 
 # --- Email ---
 def send_email(subject, body):
-    msg = MIMEText(body, "plain", "utf-8")
+    msg = MIMEText(body, "html", "utf-8")
     msg["Subject"] = subject
     msg["From"] = config.EMAIL_FROM
     msg["To"] = config.EMAIL_TO
@@ -334,29 +334,34 @@ def format_alert(entry, feed_config):
 
     subject = f"{emoji} GSP {feed_config['category']}:  {details['dir_arrow']} Exit {details['exits']}"
 
-    # Pad labels to equal width so the detail column aligns
-    W = 10  # label width including colon
-    lines = [
-        f"{emoji} {category} ALERT",
-        f"",
-        f"\U0001f4cd {'Where:':<{W}}{config.ROAD_NAME} {details['direction']}",
-        f"\U0001f522 {'Exits:':<{W}}{details['exits']}",
-        f"\U0001f4c5 {'Dates:':<{W}}{details['date_range']}",
-        f"\u23f0 {'When:':<{W}}{details['when']}",
-        f"\U0001f697 {'Impact:':<{W}}{details['impact']}",
-        f"\U0001f4cb {'Status:':<{W}}{details['status']}",
-        f"\U0001f527 {'Type:':<{W}}{details['event_type']}",
+    rows = [
+        ("\U0001f4cd", "Where:", f"{config.ROAD_NAME} {details['direction']}"),
+        ("\U0001f522", "Exits:", details['exits']),
+        ("\U0001f4c5", "Dates:", details['date_range']),
+        ("\u23f0", "When:", details['when']),
+        ("\U0001f697", "Impact:", details['impact']),
+        ("\U0001f4cb", "Status:", details['status']),
+        ("\U0001f527", "Type:", details['event_type']),
     ]
 
-    if link:
-        lines.append(f"")
-        lines.append(f"\U0001f517 {'Link:':<{W}}{link}")
+    table_rows = "\n".join(
+        f'<tr><td style="padding-right:12px;white-space:nowrap;">{em} {label}</td><td>{value}</td></tr>'
+        for em, label, value in rows
+    )
 
-    lines.append(f"")
-    lines.append(f"--")
-    lines.append(f"\U0001f6e3\ufe0f GSP Monitor | Exits {config.EXIT_MIN}\u2013{config.EXIT_MAX}")
+    link_html = f'<br>\U0001f517 <a href="{link}">Details</a>' if link else ""
 
-    body = "\n".join(lines) + "\n"
+    body = f"""\
+<div style="font-family:sans-serif;font-size:14px;">
+<b>{emoji} {category} ALERT</b><br><br>
+<table style="border-collapse:collapse;">
+{table_rows}
+</table>
+{link_html}
+<br>
+<small>\U0001f6e3\ufe0f GSP Monitor | Exits {config.EXIT_MIN}\u2013{config.EXIT_MAX}</small>
+</div>
+"""
     return subject, body
 
 # --- Main Loop ---

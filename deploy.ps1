@@ -12,7 +12,7 @@ Write-Host "Installing dependencies on VM..."
 ssh -i $SSH_KEY $SERVER "cd $REMOTE_DIR && pip install -r requirements.txt -q"
 
 Write-Host "Clearing alert history and restarting monitor on VM..."
-ssh -i $SSH_KEY $SERVER "pkill -f 'python3 $REMOTE_DIR/monitor.py' 2>/dev/null; sleep 1; rm -f $REMOTE_DIR/seen_incidents.db; cd $REMOTE_DIR && setsid python3 $REMOTE_DIR/monitor.py >> $REMOTE_DIR/monitor.log 2>&1 < /dev/null &"
+ssh -i $SSH_KEY $SERVER "screen -S gsp-monitor -X quit 2>/dev/null; pkill -f 'python3 $REMOTE_DIR/monitor.py' 2>/dev/null; sleep 1; rm -f $REMOTE_DIR/seen_incidents.db; cd $REMOTE_DIR && screen -dmS gsp-monitor /usr/bin/python3 $REMOTE_DIR/monitor.py"
 
 Start-Sleep -Seconds 3
 
