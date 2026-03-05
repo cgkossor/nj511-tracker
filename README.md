@@ -7,7 +7,7 @@ Polls [511NJ.org](https://511nj.org) RSS feeds every 5 minutes for traffic event
 | Category | Emoji | Trigger | When Sent |
 |---|---|---|---|
 | **Incident** | 🚨 | Any matching event | Immediately, once per day per incident |
-| **Congestion** | 🚗 | Any matching event | Immediately, once per day |
+| **Congestion** | 🚗 | Any matching event | After 8 PM ET only, once per day |
 | **Weather** | 🌧️ | Any matching event | Immediately, once per day |
 | **Construction** | 🚧 | Lane closure keywords required | When active or starting within 30 min |
 | **Special Event** | 🎪 | Any matching event | When active or starting within 30 min |
@@ -64,6 +64,7 @@ DIRECTIONS = ["northbound", "southbound"]
 
 POLL_INTERVAL = 5          # minutes
 ALERT_LEAD_MINUTES = 30    # alert before scheduled events start
+CONGESTION_ALERT_AFTER_HOUR = 20  # only send congestion alerts at or after this hour (24h, local time)
 ```
 
 4. Install the systemd service:
