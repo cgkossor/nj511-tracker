@@ -92,3 +92,58 @@ sudo systemctl status gsp-monitor    # check if running
 sudo systemctl restart gsp-monitor   # restart
 journalctl -u gsp-monitor -f         # view live logs
 ```
+
+---
+
+## Congestion Trend Tracker
+
+A separate system that monitors the **full length of the GSP** to collect congestion data and analyze trends over time.
+
+### Components
+
+| File | Purpose | Runs On |
+|---|---|---|
+| `collector.py` | Polls congestion feed every 5 min, stores all GSP events in SQLite | VM (systemd) |
+| `analysis.py` | Shared analysis functions (worst sections, NB vs SB, commute patterns, etc.) | Imported |
+| `digest.py` | Sends a daily HTML email digest with key stats | VM (cron/schedule) |
+| `dashboard.py` | Generates a standalone HTML report with interactive Plotly charts | Local |
+
+### Analysis Capabilities
+
+- **Worst Sections** — Which exit ranges have the most congestion events
+- **NB vs SB by Time of Day** — Direction comparison by hour
+- **Commute Comparison** — Morning (5-10 AM) vs Evening (3-8 PM) by direction
+- **Day of Week Patterns** — Weekday vs weekend congestion
+- **Duration Analysis** — How long congestion persists by section
+- **Weekly Trends** — Is congestion getting better or worse over time
+- **Peak Hours Heatmap** — Hour x day-of-week congestion grid
+
+### VM Setup (Collector + Digest)
+
+```bash
+# Install the collector service
+sudo cp gsp-collector.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable gsp-collector
+sudo systemctl start gsp-collector
+
+# Run digest on a daily cron (e.g., 9 PM)
+crontab -e
+# Add: 0 21 * * * cd /home/ubuntu/nj511-tracker && python3 digest.py --now
+```
+
+### Local Dashboard
+
+```bash
+# Sync the DB from the VM
+scp ubuntu@your-vm:~/nj511-tracker/gsp_congestion.db .
+
+# Generate the report (opens in browser)
+python dashboard.py
+
+# Options
+python dashboard.py --days 7          # last 7 days only
+python dashboard.py --days 90         # last 90 days
+python dashboard.py --no-open         # don't auto-open browser
+python dashboard.py --output my.html  # custom output file
+```

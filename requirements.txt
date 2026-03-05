@@ -2,3 +2,5 @@ requests
 feedparser
 schedule
 python-dateutil
+pandas
+plotly

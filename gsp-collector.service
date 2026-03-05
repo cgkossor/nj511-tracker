@@ -1,0 +1,25 @@
+# GSP Congestion Trend Collector - systemd service file
+#
+# Installation:
+#   1. Copy to systemd:  sudo cp gsp-collector.service /etc/systemd/system/
+#   2. Reload systemd:   sudo systemctl daemon-reload
+#   3. Enable on boot:   sudo systemctl enable gsp-collector
+#   4. Start now:        sudo systemctl start gsp-collector
+#   5. Check status:     sudo systemctl status gsp-collector
+#   6. View logs:        journalctl -u gsp-collector -f
+
+[Unit]
+Description=GSP Congestion Trend Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/nj511-tracker
+ExecStart=/usr/bin/python3 collector.py
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
