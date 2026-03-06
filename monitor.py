@@ -382,7 +382,9 @@ def check_feed():
 
         matched = 0
         for entry in entries:
-            inc_id = entry.get("id") or entry.get("link") or str(hash(str(entry)))
+            # Use title-based key to dedup same event across Construction/Planned feeds
+            title_key = re.sub(r'\s+', ' ', (entry.get("title") or "").strip().lower())
+            inc_id = title_key or entry.get("id") or entry.get("link") or str(hash(str(entry)))
 
             if not is_relevant(entry, feed_config):
                 mark_seen(conn, inc_id)
