@@ -6,8 +6,11 @@ import time
 import re
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dateutil import parser as dateparser
 import config
+
+ET = ZoneInfo("America/New_York")
 
 # --- Feed Definitions ---
 FEEDS = [
@@ -74,17 +77,17 @@ def already_alerted_today(conn, incident_id):
         return False
     try:
         last = datetime.fromisoformat(row[0])
-        return last.date() == datetime.now().date()
+        return last.date() == datetime.now(ET).date()
     except ValueError:
         return False
 
 def mark_seen(conn, incident_id):
     conn.execute("INSERT OR IGNORE INTO seen (incident_id, first_seen) VALUES (?, ?)",
-                 (incident_id, datetime.now().isoformat()))
+                 (incident_id, datetime.now(ET).isoformat()))
     conn.commit()
 
 def mark_alerted(conn, incident_id):
-    now = datetime.now().isoformat()
+    now = datetime.now(ET).isoformat()
     conn.execute("""
         INSERT INTO seen (incident_id, first_seen, last_alerted) VALUES (?, ?, ?)
         ON CONFLICT(incident_id) DO UPDATE SET last_alerted = ?
@@ -96,10 +99,10 @@ def fetch_feed(url):
     try:
         feed = feedparser.parse(url)
         if feed.bozo:
-            print(f"[{datetime.now()}] Feed parse warning ({url}): {feed.bozo_exception}")
+            print(f"[{datetime.now(ET)}] Feed parse warning ({url}): {feed.bozo_exception}")
         return feed.entries
     except Exception as e:
-        print(f"[{datetime.now()}] Feed fetch error ({url}): {e}")
+        print(f"[{datetime.now(ET)}] Feed fetch error ({url}): {e}")
         return []
 
 def extract_exit_numbers(text):
@@ -178,7 +181,7 @@ def is_active_or_upcoming(schedule_info):
     if not schedule_info:
         return True
 
-    now = datetime.now()
+    now = datetime.now(ET)
     today = now.date()
     current_time = now.time()
     lead = timedelta(minutes=config.ALERT_LEAD_MINUTES)
@@ -201,7 +204,7 @@ def is_active_or_upcoming(schedule_info):
     if "time_start" in schedule_info and "time_end" in schedule_info:
         t_start = schedule_info["time_start"]
         t_end = schedule_info["time_end"]
-        lead_time = (datetime.combine(today, t_start) - lead).time()
+        lead_time = (datetime.combine(today, t_start, tzinfo=ET) - lead).time()
 
         if t_start > t_end:
             is_active = current_time >= t_start or current_time <= t_end
@@ -252,7 +255,7 @@ def parse_details(entry, feed_config):
             except (ValueError, TypeError):
                 date_str = published
         else:
-            date_str = datetime.now().strftime("%A %B %d, %Y")
+            date_str = datetime.now(ET).strftime("%A %B %d, %Y")
 
     # Day-of-week
     dow_match = re.search(
@@ -282,9 +285,9 @@ def parse_details(entry, feed_config):
     # Status
     schedule_info = parse_schedule(desc)
     if schedule_info and "time_start" in schedule_info:
-        now = datetime.now()
+        now = datetime.now(ET)
         t_start = schedule_info["time_start"]
-        start_dt = datetime.combine(now.date(), t_start)
+        start_dt = datetime.combine(now.date(), t_start, tzinfo=ET)
         if now.time() < t_start:
             total_mins = int((start_dt - now).total_seconds() / 60)
             if total_mins >= 60:
@@ -322,9 +325,9 @@ def send_email(subject, body):
             server.starttls()
             server.login(config.EMAIL_FROM, config.EMAIL_PASSWORD)
             server.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
-        print(f"[{datetime.now()}] Email sent: {subject}")
+        print(f"[{datetime.now(ET)}] Email sent: {subject}")
     except Exception as e:
-        print(f"[{datetime.now()}] Email error: {e}")
+        print(f"[{datetime.now(ET)}] Email error: {e}")
 
 def format_alert(entry, feed_config):
     details = parse_details(entry, feed_config)
@@ -366,13 +369,13 @@ def format_alert(entry, feed_config):
 
 # --- Main Loop ---
 def check_feed():
-    print(f"[{datetime.now()}] Checking feeds...")
+    print(f"[{datetime.now(ET)}] Checking feeds...")
     conn = init_db()
     total_matched = 0
 
     for feed_config in FEEDS:
         entries = fetch_feed(feed_config["url"])
-        print(f"[{datetime.now()}] {feed_config['category']}: {len(entries)} entries")
+        print(f"[{datetime.now(ET)}] {feed_config['category']}: {len(entries)} entries")
 
         matched = 0
         for entry in entries:
@@ -388,7 +391,7 @@ def check_feed():
             if feed_config["urgent"]:
                 # Congestion alerts only after configured hour
                 if feed_config["category"] == "Congestion":
-                    if datetime.now().hour < config.CONGESTION_ALERT_AFTER_HOUR:
+                    if datetime.now(ET).hour < config.CONGESTION_ALERT_AFTER_HOUR:
                         mark_seen(conn, inc_id)
                         continue
                 # Urgent feeds (incidents, congestion, weather) — alert immediately
@@ -417,7 +420,7 @@ def check_feed():
 
         total_matched += matched
 
-    print(f"[{datetime.now()}] {total_matched} new alerts sent across all feeds")
+    print(f"[{datetime.now(ET)}] {total_matched} new alerts sent across all feeds")
     conn.close()
 
 if __name__ == "__main__":
