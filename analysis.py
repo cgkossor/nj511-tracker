@@ -1,7 +1,10 @@
 import sqlite3
 import pandas as pd
 from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 import config
 
 ET = ZoneInfo("America/New_York")

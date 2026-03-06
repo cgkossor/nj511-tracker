@@ -4,3 +4,4 @@ schedule
 python-dateutil
 pandas
 plotly
+backports.zoneinfo;python_version<"3.9"

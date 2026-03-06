@@ -6,7 +6,10 @@ import time
 import re
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    from backports.zoneinfo import ZoneInfo
 from dateutil import parser as dateparser
 import config
 
