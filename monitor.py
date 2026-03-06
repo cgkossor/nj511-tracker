@@ -74,13 +74,15 @@ def init_db():
     conn.commit()
     return conn
 
-def already_alerted_today(conn, incident_id):
+def already_alerted_recently(conn, incident_id):
     row = conn.execute("SELECT last_alerted FROM seen WHERE incident_id = ?", (incident_id,)).fetchone()
     if row is None or row[0] is None:
         return False
     try:
         last = datetime.fromisoformat(row[0])
-        return last.date() == datetime.now(ET).date()
+        if last.tzinfo is None:
+            last = last.replace(tzinfo=ET)
+        return (datetime.now(ET) - last) < timedelta(hours=config.ALERT_COOLDOWN_HOURS)
     except ValueError:
         return False
 
@@ -400,7 +402,7 @@ def check_feed():
                         mark_seen(conn, inc_id)
                         continue
                 # Urgent feeds (incidents, congestion, weather) — alert immediately
-                if not already_alerted_today(conn, inc_id):
+                if not already_alerted_recently(conn, inc_id):
                     subject, body = format_alert(entry, feed_config)
                     send_email(subject, body)
                     mark_alerted(conn, inc_id)
@@ -408,7 +410,7 @@ def check_feed():
             elif schedule_info:
                 # Scheduled event — only alert if active/upcoming
                 if is_active_or_upcoming(schedule_info):
-                    if not already_alerted_today(conn, inc_id):
+                    if not already_alerted_recently(conn, inc_id):
                         subject, body = format_alert(entry, feed_config)
                         send_email(subject, body)
                         mark_alerted(conn, inc_id)
@@ -417,7 +419,7 @@ def check_feed():
                     mark_seen(conn, inc_id)
             else:
                 # Non-urgent, no schedule — alert once
-                if not already_alerted_today(conn, inc_id):
+                if not already_alerted_recently(conn, inc_id):
                     subject, body = format_alert(entry, feed_config)
                     send_email(subject, body)
                     mark_alerted(conn, inc_id)
