@@ -212,7 +212,21 @@ def is_active_or_upcoming(schedule_info):
         lead_time = (datetime.combine(today, t_start, tzinfo=ET) - lead).time()
 
         if t_start > t_end:
-            is_active = current_time >= t_start or current_time <= t_end
+            # Overnight window (e.g. 8 PM–6 AM) spans two calendar days.
+            # Early-morning hours (before t_end) belong to the previous
+            # night's session, so they are NOT active on the first date.
+            # Evening hours (after t_start) are NOT active on the last date
+            # because the work already ended that morning.
+            in_morning_portion = current_time <= t_end
+            in_evening_portion = current_time >= t_start
+            start_date = schedule_info.get("start_date")
+            end_date = schedule_info.get("end_date")
+            if in_morning_portion and start_date and today == start_date.date():
+                is_active = False
+            elif in_evening_portion and end_date and today == end_date.date():
+                is_active = False
+            else:
+                is_active = in_evening_portion or in_morning_portion
             is_upcoming = current_time >= lead_time and current_time < t_start
         else:
             is_active = t_start <= current_time <= t_end
