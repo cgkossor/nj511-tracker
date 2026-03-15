@@ -102,7 +102,7 @@ def build_digest():
     body = f"""\
 <div style="font-family:sans-serif;font-size:14px;max-width:600px;">
 
-<h2>GSP Traffic Weekly Digest</h2>
+<h2>GSP Tracker Weekly Digest</h2>
 <p style="color:#666;">{week_start_str} \u2013 {week_end_str} | {total_events} total events | All times ET</p>
 
 <h3>Week Summary by Category</h3>
@@ -144,7 +144,7 @@ def build_digest():
 </table>
 
 <br>
-<small style="color:#999;">GSP Traffic Trend Tracker | Full parkway, all event types</small>
+<small style="color:#999;">GSP Tracker | Full parkway, all event types</small>
 </div>
 """
     return subject, body
