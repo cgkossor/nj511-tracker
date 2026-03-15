@@ -13,22 +13,27 @@ def build_digest():
         return None, None
 
     now_et = analysis.to_et(datetime.now(timezone.utc))
-    today = now_et.date()
-    yesterday_date = today - timedelta(days=1)
-    yesterday = df[df["date"] == yesterday_date]
+    week_start = (now_et - timedelta(days=7)).date()
+    week_end = (now_et - timedelta(days=1)).date()
 
-    # --- Yesterday by category ---
-    if not yesterday.empty:
-        cat_summary = analysis.events_by_category(yesterday)
-        yesterday_rows = "\n".join(
+    # --- Week summary by category ---
+    cat_summary = analysis.events_by_category(df)
+    if not cat_summary.empty:
+        summary_rows = "\n".join(
             f'<tr><td>{r["category"]}</td><td>{r["events"]}</td><td>{r["avg_duration_min"]:.0f} min</td></tr>'
             for _, r in cat_summary.iterrows()
         )
-        y_total = len(yesterday)
-        yesterday_header = f"Yesterday ({analysis.format_date(datetime.combine(yesterday_date, datetime.min.time()))}) — {y_total} events"
     else:
-        yesterday_rows = '<tr><td colspan="3">No events yesterday</td></tr>'
-        yesterday_header = "Yesterday — No events"
+        summary_rows = '<tr><td colspan="3">No events this week</td></tr>'
+
+    # --- Busiest day ---
+    day_counts = df.groupby("date").size()
+    if not day_counts.empty:
+        busiest_date = day_counts.idxmax()
+        busiest_count = day_counts.max()
+        busiest_str = f"{analysis.format_date(datetime.combine(busiest_date, datetime.min.time(), tzinfo=analysis.ET))} ({busiest_count} events)"
+    else:
+        busiest_str = "N/A"
 
     # --- Top incident hotspots (7 days) ---
     inc_hot = analysis.incident_hotspots(df, top_n=5)
@@ -87,8 +92,9 @@ def build_digest():
         trend_rows = '<tr><td colspan="4">Not enough data for trend</td></tr>'
 
     total_events = len(df)
-    date_str = now_et.strftime("%a, %b ") + str(now_et.day) + now_et.strftime(", %Y")
-    subject = f"GSP Traffic Digest \u2014 {now_et.strftime('%b')} {now_et.day} ({total_events} events this week)"
+    week_start_str = analysis.format_date(datetime.combine(week_start, datetime.min.time(), tzinfo=analysis.ET))
+    week_end_str = analysis.format_date(datetime.combine(week_end, datetime.min.time(), tzinfo=analysis.ET))
+    subject = f"GSP Weekly Digest \u2014 {week_start_str} \u2013 {week_end_str} ({total_events} events)"
 
     ts = 'style="border-collapse:collapse;width:100%;" border="1" cellpadding="6"'
     hs = 'style="background:#f0f0f0;"'
@@ -96,22 +102,23 @@ def build_digest():
     body = f"""\
 <div style="font-family:sans-serif;font-size:14px;max-width:600px;">
 
-<h2>GSP Traffic Daily Digest</h2>
-<p style="color:#666;">{date_str} | Last 7 days | All times ET</p>
+<h2>GSP Traffic Weekly Digest</h2>
+<p style="color:#666;">{week_start_str} \u2013 {week_end_str} | {total_events} total events | All times ET</p>
 
-<h3>{yesterday_header}</h3>
+<h3>Week Summary by Category</h3>
 <table {ts}>
 <tr {hs}><th>Category</th><th>Events</th><th>Avg Duration</th></tr>
-{yesterday_rows}
+{summary_rows}
 </table>
+<p style="font-size:12px;color:#666;">Busiest day: {busiest_str}</p>
 
-<h3>Top Incident Hotspots (7 days)</h3>
+<h3>Top Incident Hotspots</h3>
 <table {ts}>
 <tr {hs}><th>Section</th><th>Incidents</th></tr>
 {inc_rows}
 </table>
 
-<h3>Top Congestion Hotspots (7 days)</h3>
+<h3>Top Congestion Hotspots</h3>
 <table {ts}>
 <tr {hs}><th>Section</th><th>Events</th><th>Avg Duration</th></tr>
 {cong_rows}
@@ -130,7 +137,7 @@ def build_digest():
 {commute_rows}
 </table>
 
-<h3>Weekly Trend by Category</h3>
+<h3>Week-over-Week Trend</h3>
 <table {ts}>
 <tr {hs}><th>Category</th><th>This Week</th><th>Last Week</th><th>Change</th></tr>
 {trend_rows}
@@ -145,7 +152,7 @@ def build_digest():
 
 def send_digest():
     now = analysis.to_et(datetime.now(timezone.utc))
-    print(f"[{analysis.format_datetime(now)}] Generating daily digest...")
+    print(f"[{analysis.format_datetime(now)}] Generating weekly digest...")
     subject, body = build_digest()
     if subject is None:
         print(f"[{analysis.format_datetime(now)}] No data for digest, skipping.")
@@ -171,8 +178,11 @@ if __name__ == "__main__":
     if "--now" in sys.argv:
         send_digest()
     else:
-        print(f"GSP Digest scheduler started. Will send at {config.DIGEST_HOUR}:00 daily.")
-        schedule.every().day.at(f"{config.DIGEST_HOUR:02d}:00").do(send_digest)
+        # Convert ET hour to UTC for the scheduler (VPS runs UTC)
+        digest_et = datetime.now(analysis.ET).replace(hour=config.DIGEST_HOUR, minute=0, second=0)
+        digest_utc_hour = digest_et.astimezone(timezone.utc).hour
+        print(f"GSP Digest scheduler started. Will send Sundays at {config.DIGEST_HOUR}:00 ET ({digest_utc_hour}:00 UTC).")
+        schedule.every().sunday.at(f"{digest_utc_hour:02d}:00").do(send_digest)
         while True:
             schedule.run_pending()
             time.sleep(60)
