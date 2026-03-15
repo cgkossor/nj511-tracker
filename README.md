@@ -58,7 +58,8 @@ An event triggers an alert only if **all** of these are true:
 3. At least one exit number between 117–140
 4. Lane closure keywords (construction/planned only)
 5. Currently active or starting within 30 min (non-urgent only)
-6. Not already alerted today
+6. For overnight windows (e.g. 8 PM–6 AM), the early-morning hours on the first date and evening hours on the last date are excluded (they belong to sessions outside the date range)
+7. Not already alerted within 18 hours
 
 ---
 

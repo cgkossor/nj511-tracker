@@ -40,7 +40,13 @@ def init_db():
 
 
 def extract_exit_numbers(text):
-    return [int(x) for x in re.findall(r'\bExit\s+(\d+)', text, re.IGNORECASE)]
+    exits = [int(x) for x in re.findall(r'\bExit\s+(\d+)', text, re.IGNORECASE)]
+    if not exits:
+        lower = text.lower()
+        for landmark, (exit_lo, exit_hi) in config.LANDMARK_EXITS.items():
+            if landmark in lower:
+                exits.extend([exit_lo, exit_hi])
+    return exits
 
 
 def extract_direction(title):

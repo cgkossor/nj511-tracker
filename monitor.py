@@ -111,7 +111,13 @@ def fetch_feed(url):
         return []
 
 def extract_exit_numbers(text):
-    return [int(x) for x in re.findall(r'\bExit\s+(\d+)', text, re.IGNORECASE)]
+    exits = [int(x) for x in re.findall(r'\bExit\s+(\d+)', text, re.IGNORECASE)]
+    if not exits:
+        lower = text.lower()
+        for landmark, (exit_lo, exit_hi) in config.LANDMARK_EXITS.items():
+            if landmark in lower:
+                exits.extend([exit_lo, exit_hi])
+    return exits
 
 def is_relevant(entry, feed_config):
     title = (entry.get("title") or "").lower()
@@ -250,11 +256,20 @@ def parse_details(entry, feed_config):
 
     dir_arrow = {"Northbound": "\u2b06\ufe0f", "Southbound": "\u2b07\ufe0f"}.get(direction, "")
 
-    exits = extract_exit_numbers(desc)
+    exits = extract_exit_numbers(f"{title} {desc}")
     if exits:
         exit_str = f"{max(exits)} \u2192 {min(exits)}" if len(exits) > 1 else str(exits[0])
     else:
         exit_str = "N/A"
+
+    # Express/Local distinction for alerts south of exit 123
+    lanes_type = ""
+    if exits and min(exits) < 123:
+        desc_lower = desc.lower()
+        if "express lanes" in desc_lower or "express lane" in desc_lower:
+            lanes_type = "Express"
+        elif "local lanes" in desc_lower or "local lane" in desc_lower:
+            lanes_type = "Local"
 
     event_type = title.split(":")[-1].strip() if ":" in title else feed_config["category"]
 
@@ -325,6 +340,7 @@ def parse_details(entry, feed_config):
         "direction": direction,
         "dir_arrow": dir_arrow,
         "exits": exit_str,
+        "lanes_type": lanes_type,
         "event_type": event_type,
         "date_range": date_str,
         "when": when_str,
@@ -354,10 +370,15 @@ def format_alert(entry, feed_config):
     emoji = feed_config["emoji"]
     category = feed_config["category"].upper()
 
-    subject = f"{emoji} GSP {feed_config['category']}:  {details['dir_arrow']} Exit {details['exits']}"
+    lanes_label = f" ({details['lanes_type']})" if details['lanes_type'] else ""
+    subject = f"{emoji} GSP {feed_config['category']}:  {details['dir_arrow']} Exit {details['exits']}{lanes_label}"
+
+    where_str = f"{config.ROAD_NAME} {details['direction']}"
+    if details['lanes_type']:
+        where_str += f" — {details['lanes_type']} Lanes"
 
     rows = [
-        ("\U0001f4cd", "Where:", f"{config.ROAD_NAME} {details['direction']}"),
+        ("\U0001f4cd", "Where:", where_str),
         ("\U0001f522", "Exits:", details['exits']),
         ("\U0001f4c5", "Dates:", details['date_range']),
         ("\u23f0", "When:", details['when']),
