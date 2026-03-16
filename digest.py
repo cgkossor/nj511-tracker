@@ -1,3 +1,5 @@
+import argparse
+import os
 import smtplib
 import schedule
 import time
@@ -7,8 +9,9 @@ import config
 import analysis
 
 
-def build_digest():
-    df = analysis.load_events(days=7)
+def build_digest(data_dir=None):
+    db_path = os.path.join(data_dir, config.TRACKER_DB) if data_dir else None
+    df = analysis.load_events(days=7, db_path=db_path)
     if df.empty:
         return None, None
 
@@ -150,10 +153,10 @@ def build_digest():
     return subject, body
 
 
-def send_digest():
+def send_digest(data_dir=None):
     now = analysis.to_et(datetime.now(timezone.utc))
     print(f"[{analysis.format_datetime(now)}] Generating weekly digest...")
-    subject, body = build_digest()
+    subject, body = build_digest(data_dir=data_dir)
     if subject is None:
         print(f"[{analysis.format_datetime(now)}] No data for digest, skipping.")
         return
@@ -174,15 +177,22 @@ def send_digest():
 
 
 if __name__ == "__main__":
-    import sys
-    if "--now" in sys.argv:
-        send_digest()
+    parser = argparse.ArgumentParser(description="GSP Weekly Digest")
+    parser.add_argument("--data-dir", type=str, default=None, help="Directory for data files (default: current dir)")
+    parser.add_argument("--now", action="store_true", help="Send digest immediately and exit")
+    args = parser.parse_args()
+
+    if args.data_dir:
+        print(f"Data directory: {args.data_dir}")
+
+    if args.now:
+        send_digest(data_dir=args.data_dir)
     else:
         # Convert ET hour to UTC for the scheduler (VPS runs UTC)
         digest_et = datetime.now(analysis.ET).replace(hour=config.DIGEST_HOUR, minute=0, second=0)
         digest_utc_hour = digest_et.astimezone(timezone.utc).hour
         print(f"GSP Digest scheduler started. Will send Sundays at {config.DIGEST_HOUR}:00 ET ({digest_utc_hour}:00 UTC).")
-        schedule.every().sunday.at(f"{digest_utc_hour:02d}:00").do(send_digest)
+        schedule.every().sunday.at(f"{digest_utc_hour:02d}:00").do(send_digest, data_dir=args.data_dir)
         while True:
             schedule.run_pending()
             time.sleep(60)

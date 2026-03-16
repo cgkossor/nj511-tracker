@@ -24,14 +24,16 @@ Everything runs in Docker on a shared `web` network, fronted by an Nginx reverse
 │   │   ├── inyo-scanner/
 │   │   ├── nj511-tracker/
 │   │   ├── grca-bot/
-│   │   └── website-tracker/ ← Website change tracker (this repo)
+│   │   ├── website-tracker/ 
+│   │   └── mtfca-monitor/  
 │   └── data/               ← Persistent data (.db, .json)
 │       ├── recgov-monitor/
 │       ├── yosemite-scanner/
 │       ├── inyo-scanner/
 │       ├── nj511-tracker/
 │       ├── grca-bot/
-│       └── website-tracker/  ← tracker.db
+│       ├── website-tracker/  
+│       └── mtfca-monitor/    
 └──
 ```
 

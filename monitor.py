@@ -1,4 +1,6 @@
+import argparse
 import feedparser
+import os
 import sqlite3
 import smtplib
 import schedule
@@ -62,8 +64,9 @@ FEEDS = [
 ]
 
 # --- Database ---
-def init_db():
-    conn = sqlite3.connect("seen_incidents.db")
+def init_db(data_dir=None):
+    db_path = os.path.join(data_dir, "seen_incidents.db") if data_dir else "seen_incidents.db"
+    conn = sqlite3.connect(db_path)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS seen (
             incident_id  TEXT PRIMARY KEY,
@@ -408,9 +411,9 @@ def format_alert(entry, feed_config):
     return subject, body
 
 # --- Main Loop ---
-def check_feed():
+def check_feed(data_dir=None):
     print(f"[{datetime.now(ET)}] Checking feeds...")
-    conn = init_db()
+    conn = init_db(data_dir)
     total_matched = 0
 
     for feed_config in FEEDS:
@@ -466,11 +469,17 @@ def check_feed():
     conn.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GSP Monitor — real-time alerts")
+    parser.add_argument("--data-dir", type=str, default=None, help="Directory for data files (default: current dir)")
+    args = parser.parse_args()
+
     print(f"GSP Monitor started. Polling every {config.POLL_INTERVAL} minutes.")
     print(f"Watching: {config.ROAD_NAME} | Exits {config.EXIT_MIN}\u2013{config.EXIT_MAX} | {config.DIRECTIONS}")
     print(f"Feeds: {len(FEEDS)} categories")
-    check_feed()
-    schedule.every(config.POLL_INTERVAL).minutes.do(check_feed)
+    if args.data_dir:
+        print(f"Data directory: {args.data_dir}")
+    check_feed(data_dir=args.data_dir)
+    schedule.every(config.POLL_INTERVAL).minutes.do(check_feed, data_dir=args.data_dir)
     while True:
         schedule.run_pending()
         time.sleep(30)

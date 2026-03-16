@@ -1,4 +1,6 @@
+import argparse
 import feedparser
+import os
 import sqlite3
 import schedule
 import time
@@ -17,8 +19,9 @@ FEEDS = [
 ]
 
 
-def init_db():
-    conn = sqlite3.connect(config.TRACKER_DB)
+def init_db(data_dir=None):
+    db_path = os.path.join(data_dir, config.TRACKER_DB) if data_dir else config.TRACKER_DB
+    conn = sqlite3.connect(db_path)
     # New unified events table
     conn.execute("""
         CREATE TABLE IF NOT EXISTS events (
@@ -58,10 +61,10 @@ def extract_direction(title):
     return None
 
 
-def collect():
+def collect(data_dir=None):
     now_utc = datetime.now(timezone.utc).isoformat()
     print(f"[{now_utc}] Collecting all GSP feeds...")
-    conn = init_db()
+    conn = init_db(data_dir)
 
     total_new = 0
     total_updated = 0
@@ -121,10 +124,17 @@ def collect():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="GSP Collector — trend data")
+    parser.add_argument("--data-dir", type=str, default=None, help="Directory for data files (default: current dir)")
+    args = parser.parse_args()
+
+    db_display = os.path.join(args.data_dir, config.TRACKER_DB) if args.data_dir else config.TRACKER_DB
     print(f"GSP Collector started. Polling {len(FEEDS)} feeds every {config.COLLECTOR_POLL_INTERVAL} minutes.")
-    print(f"Database: {config.TRACKER_DB}")
-    collect()
-    schedule.every(config.COLLECTOR_POLL_INTERVAL).minutes.do(collect)
+    print(f"Database: {db_display}")
+    if args.data_dir:
+        print(f"Data directory: {args.data_dir}")
+    collect(data_dir=args.data_dir)
+    schedule.every(config.COLLECTOR_POLL_INTERVAL).minutes.do(collect, data_dir=args.data_dir)
     while True:
         schedule.run_pending()
         time.sleep(30)
