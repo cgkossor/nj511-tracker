@@ -6,6 +6,7 @@ gsp_congestion.db
 gsp_report.html
 OPERATIONS.md
 VPS_STRUCTURE.md
+DISCORD_NOTIFICATIONS.md
 monitor.log
 __pycache__/
 venv/

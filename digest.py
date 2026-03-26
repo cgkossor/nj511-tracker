@@ -1,12 +1,11 @@
 import argparse
 import os
-import smtplib
 import schedule
 import time
-from email.mime.text import MIMEText
 from datetime import datetime, timedelta, timezone
 import config
 import analysis
+import notifications
 
 
 def build_digest(data_dir=None):
@@ -161,19 +160,9 @@ def send_digest(data_dir=None):
         print(f"[{analysis.format_datetime(now)}] No data for digest, skipping.")
         return
 
-    msg = MIMEText(body, "html", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = config.EMAIL_FROM
-    msg["To"] = config.EMAIL_TO
-
-    try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
-            server.starttls()
-            server.login(config.EMAIL_FROM, config.EMAIL_PASSWORD)
-            server.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
-        print(f"[{analysis.format_datetime(now)}] Digest sent: {subject}")
-    except Exception as e:
-        print(f"[{analysis.format_datetime(now)}] Digest email error: {e}")
+    notifications.notify_email(subject, body)
+    notifications.notify_discord(subject, body)
+    print(f"[{analysis.format_datetime(now)}] Digest sent: {subject}")
 
 
 if __name__ == "__main__":

@@ -2,11 +2,9 @@ import argparse
 import feedparser
 import os
 import sqlite3
-import smtplib
 import schedule
 import time
 import re
-from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 try:
     from zoneinfo import ZoneInfo
@@ -14,6 +12,7 @@ except ImportError:
     from backports.zoneinfo import ZoneInfo
 from dateutil import parser as dateparser
 import config
+import notifications
 
 ET = ZoneInfo("America/New_York")
 
@@ -351,21 +350,9 @@ def parse_details(entry, feed_config):
         "status": status,
     }
 
-# --- Email ---
-def send_email(subject, body):
-    msg = MIMEText(body, "html", "utf-8")
-    msg["Subject"] = subject
-    msg["From"] = config.EMAIL_FROM
-    msg["To"] = config.EMAIL_TO
-
-    try:
-        with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT) as server:
-            server.starttls()
-            server.login(config.EMAIL_FROM, config.EMAIL_PASSWORD)
-            server.sendmail(config.EMAIL_FROM, config.EMAIL_TO, msg.as_string())
-        print(f"[{datetime.now(ET)}] Email sent: {subject}")
-    except Exception as e:
-        print(f"[{datetime.now(ET)}] Email error: {e}")
+# --- Notifications ---
+def send_alert(subject, body):
+    notifications.notify_discord(subject, body)
 
 def format_alert(entry, feed_config):
     details = parse_details(entry, feed_config)
@@ -442,7 +429,7 @@ def check_feed(data_dir=None):
                 # Urgent feeds (incidents, congestion, weather) — alert immediately
                 if not already_alerted_recently(conn, inc_id):
                     subject, body = format_alert(entry, feed_config)
-                    send_email(subject, body)
+                    send_alert(subject, body)
                     mark_alerted(conn, inc_id)
                     matched += 1
             elif schedule_info:
@@ -450,7 +437,7 @@ def check_feed(data_dir=None):
                 if is_active_or_upcoming(schedule_info):
                     if not already_alerted_recently(conn, inc_id):
                         subject, body = format_alert(entry, feed_config)
-                        send_email(subject, body)
+                        send_alert(subject, body)
                         mark_alerted(conn, inc_id)
                         matched += 1
                 else:
@@ -459,7 +446,7 @@ def check_feed(data_dir=None):
                 # Non-urgent, no schedule — alert once
                 if not already_alerted_recently(conn, inc_id):
                     subject, body = format_alert(entry, feed_config)
-                    send_email(subject, body)
+                    send_alert(subject, body)
                     mark_alerted(conn, inc_id)
                     matched += 1
 
