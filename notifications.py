@@ -76,7 +76,7 @@ def _send_discord(subject, message, max_retries=3):
                     data=payload.encode("utf-8"),
                     headers={
                         "Content-Type": "application/json",
-                        "User-Agent": "NJ511-Tracker/1.0",
+                        "User-Agent": "gsp-511",
                     },
                     method="POST",
                 )
