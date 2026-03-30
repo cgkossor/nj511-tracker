@@ -5,6 +5,7 @@ import sqlite3
 import schedule
 import time
 import re
+import urllib.request
 from datetime import datetime, timedelta
 try:
     from zoneinfo import ZoneInfo
@@ -102,12 +103,20 @@ def mark_alerted(conn, incident_id):
     conn.commit()
 
 # --- Feed Parsing ---
+FEED_TIMEOUT = 30  # seconds before a feed fetch is considered hung
+
 def fetch_feed(url):
     try:
-        feed = feedparser.parse(url)
+        req = urllib.request.Request(url, headers={"User-Agent": "gsp-511"})
+        with urllib.request.urlopen(req, timeout=FEED_TIMEOUT) as resp:
+            content = resp.read()
+        feed = feedparser.parse(content)
         if feed.bozo:
             print(f"[{datetime.now(ET)}] Feed parse warning ({url}): {feed.bozo_exception}")
         return feed.entries
+    except TimeoutError:
+        print(f"[{datetime.now(ET)}] FEED TIMEOUT ({FEED_TIMEOUT}s exceeded): {url}")
+        return []
     except Exception as e:
         print(f"[{datetime.now(ET)}] Feed fetch error ({url}): {e}")
         return []
