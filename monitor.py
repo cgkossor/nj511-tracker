@@ -104,8 +104,10 @@ def mark_alerted(conn, incident_id):
 
 # --- Feed Parsing ---
 FEED_TIMEOUT = 30  # seconds before a feed fetch is considered hung
+_timed_out_feeds = set()  # tracks feeds currently in a timeout state
 
 def fetch_feed(url):
+    global _timed_out_feeds
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "gsp-511"})
         with urllib.request.urlopen(req, timeout=FEED_TIMEOUT) as resp:
@@ -113,10 +115,28 @@ def fetch_feed(url):
         feed = feedparser.parse(content)
         if feed.bozo:
             print(f"[{datetime.now(ET)}] Feed parse warning ({url}): {feed.bozo_exception}")
+
+        # Send recovery alert if this feed previously timed out
+        if url in _timed_out_feeds:
+            _timed_out_feeds.discard(url)
+            notifications.notify_discord(
+                "✅ GSP Monitor — Feed Resumed",
+                f"Feed is responding again:\n{url}"
+            )
+            print(f"[{datetime.now(ET)}] Feed resumed: {url}")
+
         return feed.entries
+
     except TimeoutError:
         print(f"[{datetime.now(ET)}] FEED TIMEOUT ({FEED_TIMEOUT}s exceeded): {url}")
+        if url not in _timed_out_feeds:
+            _timed_out_feeds.add(url)
+            notifications.notify_discord(
+                "⚠️ GSP Monitor — Feed Timeout",
+                f"Feed not responding after {FEED_TIMEOUT}s. Alerts from this feed are paused.\n{url}"
+            )
         return []
+
     except Exception as e:
         print(f"[{datetime.now(ET)}] Feed fetch error ({url}): {e}")
         return []
